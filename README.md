@@ -9,12 +9,12 @@ Each agent gets an animated character that walks around, sits at desks, and show
 ## Quick Start
 
 ```bash
-npx pixel-office
+npx pixel-office-openclaw
 ```
 
 That's it. Pixel Office auto-detects your local OpenClaw instance and starts a web server at `http://localhost:3002`.
 
-> **No OpenClaw?** Try `npx pixel-office --mock` to see it with simulated agents.
+> **No OpenClaw?** Try `npx pixel-office-openclaw --mock` to see it with simulated agents.
 
 ## Features
 
@@ -32,14 +32,14 @@ That's it. Pixel Office auto-detects your local OpenClaw instance and starts a w
 ### Global install (recommended)
 
 ```bash
-npm install -g pixel-office
-pixel-office
+npm install -g pixel-office-openclaw
+pixel-office-openclaw
 ```
 
 ### npx (no install)
 
 ```bash
-npx pixel-office
+npx pixel-office-openclaw
 ```
 
 ### From source
@@ -57,7 +57,7 @@ npm start
 Pixel Office auto-detects your OpenClaw setup. Override with CLI flags:
 
 ```
-pixel-office [options]
+pixel-office-openclaw [options]
 
 Options:
   -p, --port <number>       Port (default: 3002)
@@ -74,16 +74,16 @@ Options:
 
 ```bash
 # Default — auto-detect everything
-pixel-office
+pixel-office-openclaw
 
 # Custom port
-pixel-office --port 8080
+pixel-office-openclaw --port 8080
 
 # Expose to your network (default is localhost only)
-pixel-office --host 0.0.0.0
+pixel-office-openclaw --host 0.0.0.0
 
 # Demo mode — no OpenClaw needed
-pixel-office --mock
+pixel-office-openclaw --mock
 
 # Remote OpenClaw instance
 pixel-office --gateway-url http://myserver:18789 --gateway-token mytoken
@@ -94,7 +94,7 @@ pixel-office --gateway-url http://myserver:18789 --gateway-token mytoken
 By default, Pixel Office only listens on `127.0.0.1` (localhost). To access from other machines:
 
 ```bash
-pixel-office --host 0.0.0.0
+pixel-office-openclaw --host 0.0.0.0
 ```
 
 ⚠️ **Security**: When exposed to a network, the server can read your agent sessions and send messages. Only expose on trusted networks.
