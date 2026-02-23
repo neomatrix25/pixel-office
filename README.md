@@ -1,73 +1,106 @@
-# React + TypeScript + Vite
+# Pixel Office
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A standalone React + Canvas 2D pixel-art office visualizer for OpenClaw agent sessions. Watch your AI agents work in a virtual office -- each agent gets a desk, walks around, and shows real-time status as they execute tasks.
 
-Currently, two official plugins are available:
+![Screenshot placeholder](docs/screenshot.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- Real-time pixel-art office with animated agent characters
+- Connects to OpenClaw gateway to visualize live agent sessions
+- Agent identity: displays session name, model, and role
+- Status indicators: green glow (active), yellow (waiting), grey (idle)
+- Role-based sprite palettes (coders, researchers, planners get distinct looks)
+- Interactive layout editor with undo/redo, furniture placement, and color controls
+- Speech bubbles for permission requests and waiting states
+- Matrix-style spawn/despawn animations
+- Mock mode for demo and development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Quick Start
 
-## Expanding the ESLint configuration
+```bash
+# Install dependencies
+npm install
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start dev server
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open `http://localhost:5173` in your browser.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Connecting to OpenClaw
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Enter your OpenClaw gateway URL and API token on the connection screen
+2. The adapter polls `/sessions_list` and maps sessions to office agents
+3. Credentials are saved to localStorage for auto-reconnect
+
+## Mock Mode
+
+Add `?mock=true` to the URL to run with simulated agents:
+
 ```
+http://localhost:5173/?mock=true
+```
+
+This creates 3 mock agents that cycle through tool activities -- useful for development and demos without a running OpenClaw instance.
+
+## Architecture
+
+```
+src/
+  App.tsx                    # Root component, connection management
+  ConnectionScreen.tsx       # Gateway URL + token input
+  openclawAdapter.ts         # OpenClaw API poller, event bridge
+  mockProvider.ts            # Mock data for demo mode
+  eventBus.ts                # Internal pub/sub (replaces VS Code postMessage)
+  hooks/
+    useExtensionMessages.ts  # React hook consuming event bus
+  office/
+    engine/
+      officeState.ts         # Game state: characters, seats, pathfinding
+      characters.ts          # Character FSM (idle, walk, type)
+      renderer.ts            # Canvas 2D rendering (tiles, furniture, characters)
+      gameLoop.ts            # requestAnimationFrame loop
+    layout/
+      furnitureCatalog.ts    # Furniture type definitions
+      layoutSerializer.ts    # Layout JSON to/from game state
+      tileMap.ts             # Tile walkability + A* pathfinding
+    sprites/
+      spriteData.ts          # Pixel art sprite definitions
+      spriteCache.ts         # Cached scaled sprites
+    components/
+      OfficeCanvas.tsx        # Canvas element + input handling
+      ToolOverlay.tsx         # HTML overlay for tool activity display
+    editor/                  # Layout editor tools
+  components/
+    AgentLabels.tsx          # Agent name labels above characters
+    ZoomControls.tsx         # Zoom +/- buttons
+    BottomToolbar.tsx        # Edit mode + settings toggle
+    DebugView.tsx            # Debug panel for agent state inspection
+public/
+  assets/
+    default-layout.json     # Default office layout
+```
+
+## Tech Stack
+
+- **React 19** with TypeScript
+- **Vite** for build tooling
+- **Canvas 2D** for pixel-art rendering (no WebGL)
+- **Custom event bus** for decoupled component communication
+- **A* pathfinding** for character navigation
+- **FS Pixel Sans** bitmap font
+
+## Layout Editor
+
+Press the **Layout** button (bottom-left) to enter edit mode:
+
+- Paint floor tiles and walls
+- Place furniture (desks, chairs, bookshelves, plants, etc.)
+- Select, move, rotate, and delete items
+- Undo/redo with Ctrl+Z / Ctrl+Y
+- Save layouts (persisted via event bus)
+
+## License
+
+Proprietary. All rights reserved.
