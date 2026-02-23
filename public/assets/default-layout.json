@@ -20,5 +20,18 @@
     0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
   ],
-  "furniture": []
+  "furniture": [
+    {"uid":"d1","type":"2dpig-desk_mon","col":2,"row":2},
+    {"uid":"d2","type":"2dpig-desk_mon","col":5,"row":2},
+    {"uid":"d3","type":"2dpig-desk_mon","col":8,"row":2},
+    {"uid":"d4","type":"2dpig-desk_mon","col":11,"row":2},
+    {"uid":"d5","type":"2dpig-desk_mon","col":14,"row":2},
+    {"uid":"d6","type":"2dpig-desk_mon","col":17,"row":2},
+    {"uid":"d7","type":"2dpig-desk_mon","col":20,"row":2},
+    {"uid":"d8","type":"2dpig-desk_mon","col":2,"row":5},
+    {"uid":"d9","type":"2dpig-desk_mon","col":5,"row":5},
+    {"uid":"d10","type":"2dpig-desk_mon","col":8,"row":5},
+    {"uid":"d11","type":"2dpig-desk_mon","col":11,"row":5},
+    {"uid":"d12","type":"2dpig-desk_mon","col":14,"row":5}
+  ]
 }
