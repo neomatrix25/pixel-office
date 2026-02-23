@@ -337,7 +337,14 @@ app.post('/api/layout', (req, res) => {
 // ── Static Files ────────────────────────────────────────────────
 
 const distPath = join(__dirname, 'dist')
-app.use(express.static(distPath))
+app.use(express.static(distPath, {
+  setHeaders: (res, path) => {
+    // Prevent caching of HTML so new JS hashes always load
+    if (path.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    }
+  }
+}))
 
 // SPA fallback — serve index.html for all non-API routes (Express 5 syntax)
 app.get('/{*path}', (_req, res) => {

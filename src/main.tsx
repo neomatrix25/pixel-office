@@ -6,8 +6,10 @@ import App from './App.tsx'
 // ?reset=true clears all localStorage and reloads with a clean slate
 if (new URLSearchParams(window.location.search).get('reset') === 'true') {
   localStorage.clear()
-  window.location.href = window.location.pathname
+  // Redirect to clean URL without query params
+  window.location.replace(window.location.pathname)
 }
+// Build: 20260223-2251 (cache buster)
 
 // Only start the mock data provider when ?mock=true is in the URL.
 // In normal mode, the OpenClawAdapter (started from App.tsx) handles events.
