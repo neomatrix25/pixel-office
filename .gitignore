@@ -28,3 +28,4 @@ dist-ssr
 !*/assets/characters/
 !*/assets/default-layout.json
 !*/assets/walls.pngdist/
+.npmrc
