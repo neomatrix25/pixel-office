@@ -1,24 +1,98 @@
 {
   "version": 1,
-  "cols": 24,
-  "rows": 16,
+  "cols": 20,
+  "rows": 12,
   "tiles": [
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 0, 0, 3, 3, 3, 3, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 0, 0, 2, 2, 0, 0, 0, 3, 3, 3, 3, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
+    0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 0,
+    0, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 0,
+    0, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 0,
+    0, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 2, 4, 4, 4, 4, 4, 4, 4, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
   ],
-  "furniture": []
+  "furniture": [
+    {"uid": "desk-1-1", "type": "desk", "col": 1, "row": 1},
+    {"uid": "chair-1-3", "type": "chair", "col": 2, "row": 3},
+    {"uid": "chair-1-4", "type": "chair", "col": 1, "row": 3},
+    {"uid": "pc-1-1", "type": "pc", "col": 1, "row": 1},
+    {"uid": "pc-1-2", "type": "pc", "col": 2, "row": 1},
+
+    {"uid": "desk-4-1", "type": "desk", "col": 4, "row": 1},
+    {"uid": "chair-4-3", "type": "chair", "col": 5, "row": 3},
+    {"uid": "chair-4-4", "type": "chair", "col": 4, "row": 3},
+    {"uid": "pc-4-1", "type": "pc", "col": 4, "row": 1},
+    {"uid": "pc-4-2", "type": "pc", "col": 5, "row": 1},
+
+    {"uid": "desk-1-4", "type": "desk", "col": 1, "row": 4},
+    {"uid": "chair-1-6", "type": "chair", "col": 2, "row": 6},
+    {"uid": "chair-1-7", "type": "chair", "col": 1, "row": 6},
+    {"uid": "pc-1-4", "type": "pc", "col": 1, "row": 4},
+
+    {"uid": "desk-4-4", "type": "desk", "col": 4, "row": 4},
+    {"uid": "chair-4-6", "type": "chair", "col": 5, "row": 6},
+    {"uid": "chair-4-7", "type": "chair", "col": 4, "row": 6},
+    {"uid": "pc-4-4", "type": "pc", "col": 4, "row": 4},
+
+    {"uid": "desk-9-1", "type": "desk", "col": 9, "row": 1},
+    {"uid": "chair-9-3", "type": "chair", "col": 10, "row": 3},
+    {"uid": "chair-9-4", "type": "chair", "col": 9, "row": 3},
+    {"uid": "pc-9-1", "type": "pc", "col": 9, "row": 1},
+    {"uid": "pc-9-2", "type": "pc", "col": 10, "row": 1},
+
+    {"uid": "desk-11-1", "type": "desk", "col": 11, "row": 1},
+    {"uid": "chair-11-3", "type": "chair", "col": 12, "row": 3},
+    {"uid": "chair-11-4", "type": "chair", "col": 11, "row": 3},
+    {"uid": "pc-11-1", "type": "pc", "col": 11, "row": 1},
+    {"uid": "pc-11-2", "type": "pc", "col": 12, "row": 1},
+
+    {"uid": "wb-15-1", "type": "whiteboard", "col": 15, "row": 1},
+    {"uid": "chair-15-3", "type": "chair", "col": 15, "row": 3},
+    {"uid": "chair-16-3", "type": "chair", "col": 16, "row": 3},
+    {"uid": "chair-17-3", "type": "chair", "col": 17, "row": 3},
+    {"uid": "chair-18-3", "type": "chair", "col": 18, "row": 3},
+
+    {"uid": "desk-1-8", "type": "desk", "col": 1, "row": 8},
+    {"uid": "chair-1-8s", "type": "chair", "col": 1, "row": 8},
+    {"uid": "chair-2-8s", "type": "chair", "col": 2, "row": 8},
+    {"uid": "pc-1-8", "type": "pc", "col": 1, "row": 8},
+
+    {"uid": "desk-4-8", "type": "desk", "col": 4, "row": 8},
+    {"uid": "chair-4-8s", "type": "chair", "col": 4, "row": 8},
+    {"uid": "chair-5-8s", "type": "chair", "col": 5, "row": 8},
+    {"uid": "pc-4-8", "type": "pc", "col": 4, "row": 8},
+
+    {"uid": "desk-12-8", "type": "desk", "col": 12, "row": 8},
+    {"uid": "chair-12-8s", "type": "chair", "col": 12, "row": 8},
+    {"uid": "chair-13-8s", "type": "chair", "col": 13, "row": 8},
+    {"uid": "pc-12-8", "type": "pc", "col": 12, "row": 8},
+
+    {"uid": "desk-15-8", "type": "desk", "col": 15, "row": 8},
+    {"uid": "chair-15-8s", "type": "chair", "col": 15, "row": 8},
+    {"uid": "chair-16-8s", "type": "chair", "col": 16, "row": 8},
+    {"uid": "pc-15-8", "type": "pc", "col": 15, "row": 8},
+
+    {"uid": "plant-7-1", "type": "plant", "col": 7, "row": 1},
+    {"uid": "plant-7-6", "type": "plant", "col": 7, "row": 7},
+    {"uid": "plant-14-6", "type": "plant", "col": 14, "row": 7},
+    {"uid": "plant-8-10", "type": "plant", "col": 8, "row": 10},
+    {"uid": "plant-11-10", "type": "plant", "col": 11, "row": 10},
+    {"uid": "plant-1-7", "type": "plant", "col": 1, "row": 7},
+
+    {"uid": "cooler-8-7", "type": "cooler", "col": 9, "row": 7},
+
+    {"uid": "bs-7-8", "type": "bookshelf", "col": 7, "row": 8},
+    {"uid": "bs-7-10", "type": "bookshelf", "col": 7, "row": 10},
+    {"uid": "bs-18-8", "type": "bookshelf", "col": 18, "row": 8},
+    {"uid": "bs-18-10", "type": "bookshelf", "col": 18, "row": 10},
+
+    {"uid": "lamp-13-1", "type": "lamp", "col": 13, "row": 2},
+    {"uid": "lamp-18-7", "type": "lamp", "col": 18, "row": 7},
+    {"uid": "lamp-6-7", "type": "lamp", "col": 6, "row": 7}
+  ]
 }
