@@ -67,6 +67,15 @@ export const SELECTION_HIGHLIGHT_COLOR = '#007fd4'
 export const DELETE_BUTTON_BG = 'rgba(200, 50, 50, 0.85)'
 export const ROTATE_BUTTON_BG = 'rgba(50, 120, 200, 0.85)'
 
+// ── Status Glow ─────────────────────────────────────────────
+export const STATUS_GLOW_RADIUS_PX = 7
+export const STATUS_GLOW_ALPHA = 0.35
+export const STATUS_GLOW_ACTIVE_COLOR = '#5ac88c'    // green
+export const STATUS_GLOW_WAITING_COLOR = '#cca700'   // yellow
+export const STATUS_GLOW_IDLE_COLOR = '#666666'      // grey
+/** Seconds since last activity before marking as "idle" */
+export const STATUS_IDLE_THRESHOLD_SEC = 30
+
 // ── Camera ───────────────────────────────────────────────────
 export const CAMERA_FOLLOW_LERP = 0.1
 export const CAMERA_FOLLOW_SNAP_THRESHOLD = 0.5

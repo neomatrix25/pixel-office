@@ -38,6 +38,11 @@ import {
   SELECTION_HIGHLIGHT_COLOR,
   DELETE_BUTTON_BG,
   ROTATE_BUTTON_BG,
+  STATUS_GLOW_RADIUS_PX,
+  STATUS_GLOW_ALPHA,
+  STATUS_GLOW_ACTIVE_COLOR,
+  STATUS_GLOW_WAITING_COLOR,
+  STATUS_GLOW_IDLE_COLOR,
 } from '../../constants.js'
 
 // ── Render functions ────────────────────────────────────────────
@@ -165,6 +170,41 @@ export function renderScene(
           c.save()
           c.globalAlpha = outlineAlpha
           c.drawImage(outlineCached, olDrawX, olDrawY)
+          c.restore()
+        },
+      })
+    }
+
+    // Status glow: colored circle at the character's feet
+    {
+      const glowColor = ch.isActive
+        ? STATUS_GLOW_ACTIVE_COLOR
+        : (ch.state === CharacterState.IDLE && !ch.isActive)
+          ? STATUS_GLOW_IDLE_COLOR
+          : STATUS_GLOW_WAITING_COLOR
+      const glowX = Math.round(offsetX + ch.x * zoom)
+      const glowY = Math.round(offsetY + (ch.y + sittingOffset) * zoom)
+      const glowRadius = STATUS_GLOW_RADIUS_PX * zoom
+      // Capture variables for closure
+      const capturedGlowColor = glowColor
+      const capturedGlowX = glowX
+      const capturedGlowY = glowY
+      const capturedGlowRadius = glowRadius
+      drawables.push({
+        zY: charZY - OUTLINE_Z_SORT_OFFSET * 2, // behind character and outline
+        draw: (c) => {
+          c.save()
+          c.globalAlpha = STATUS_GLOW_ALPHA
+          const gradient = c.createRadialGradient(
+            capturedGlowX, capturedGlowY, 0,
+            capturedGlowX, capturedGlowY, capturedGlowRadius,
+          )
+          gradient.addColorStop(0, capturedGlowColor)
+          gradient.addColorStop(1, 'transparent')
+          c.fillStyle = gradient
+          c.beginPath()
+          c.ellipse(capturedGlowX, capturedGlowY, capturedGlowRadius, capturedGlowRadius * 0.5, 0, 0, Math.PI * 2)
+          c.fill()
           c.restore()
         },
       })
