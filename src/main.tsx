@@ -14,6 +14,11 @@ if (isMockMode) {
   })
 }
 
+// Load 2dPig CC0 sprites into the furniture catalog at startup.
+// This must run before any layoutLoaded event so getCatalogEntry() finds the assets.
+import { load2dpigAssets } from './office/sprites/load2dpigAssets.js'
+load2dpigAssets()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
