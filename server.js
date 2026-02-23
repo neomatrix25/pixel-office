@@ -103,8 +103,8 @@ app.get('/api/sessions', (req, res) => {
 const distPath = join(__dirname, 'dist')
 app.use(express.static(distPath))
 
-// SPA fallback — serve index.html for all non-API routes
-app.get('*', (_req, res) => {
+// SPA fallback — serve index.html for all non-API routes (Express 5 syntax)
+app.get('/{*path}', (_req, res) => {
   res.sendFile(join(distPath, 'index.html'))
 })
 
