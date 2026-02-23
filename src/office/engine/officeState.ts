@@ -417,10 +417,11 @@ export class OfficeState {
     if (!seatId) {
       seatId = this.findFreeSeat()
     }
-    if (!seatId) {
-      this.ensureCapacity(this.characters.size + 1)
-      seatId = this.findFreeSeat()
-    }
+    // Auto-expansion disabled — agents without seats will roam freely
+    // if (!seatId) {
+    //   this.ensureCapacity(this.characters.size + 1)
+    //   seatId = this.findFreeSeat()
+    // }
 
     let ch: Character
     if (seatId) {
