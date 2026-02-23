@@ -92,16 +92,18 @@ function saveChatHistory(agentId: string | undefined, messages: ChatMessage[]): 
   } catch { /* ignore */ }
 }
 
-async function sendChatMessage(agentId: string, message: string): Promise<boolean> {
+async function sendChatMessage(agentId: string, message: string): Promise<{ ok: boolean; reply?: string }> {
   try {
     const resp = await fetch('/api/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ agentId, message }),
     })
-    return resp.ok
+    if (!resp.ok) return { ok: false }
+    const data = await resp.json()
+    return { ok: true, reply: data.reply || undefined }
   } catch {
-    return false
+    return { ok: false }
   }
 }
 
@@ -152,12 +154,17 @@ export function ChatSidebar({ agentId, meta, isActive, onClose }: ChatSidebarPro
     setChatInput('')
     setSending(true)
 
-    const ok = await sendChatMessage(agentKey, text)
-    if (!ok) {
+    const result = await sendChatMessage(agentKey, text)
+    if (!result.ok) {
       const errMsg: ChatMessage = { role: 'agent', text: '(failed to deliver)', ts: Date.now() }
       const withErr = [...updated, errMsg]
       setChatMessages(withErr)
       saveChatHistory(agentKey, withErr)
+    } else if (result.reply) {
+      const replyMsg: ChatMessage = { role: 'agent', text: result.reply, ts: Date.now() }
+      const withReply = [...updated, replyMsg]
+      setChatMessages(withReply)
+      saveChatHistory(agentKey, withReply)
     }
     setSending(false)
     inputRef.current?.focus()
