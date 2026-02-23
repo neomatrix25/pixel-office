@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
-import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
+import type { SubagentCharacter, AgentMeta } from '../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../office/types.js'
 
 interface AgentLabelsProps {
   officeState: OfficeState
   agents: number[]
   agentStatuses: Record<number, string>
+  agentMeta: Record<number, AgentMeta>
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
@@ -17,6 +18,7 @@ export function AgentLabels({
   officeState,
   agents,
   agentStatuses,
+  agentMeta,
   containerRef,
   zoom,
   panRef,
@@ -78,7 +80,16 @@ export function AgentLabels({
           dotColor = 'var(--vscode-charts-blue, #3794ff)'
         }
 
-        const labelText = subLabelMap.get(id) || `Agent #${id}`
+        // Build label: prefer real name + model, fall back to "Agent #N"
+        let labelText = subLabelMap.get(id)
+        if (!labelText) {
+          const meta = agentMeta[id]
+          if (meta?.name) {
+            labelText = meta.model ? `${meta.name} (${meta.model})` : meta.name
+          } else {
+            labelText = `Agent #${id}`
+          }
+        }
 
         return (
           <div

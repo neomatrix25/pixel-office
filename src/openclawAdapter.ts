@@ -107,6 +107,9 @@ export class OpenClawAdapter {
   /** Map from OpenClaw session_key to tracked session state. */
   private sessions = new Map<string, TrackedSession>()
 
+  /** Map from session_key to the raw session data (for name/model/kind lookup). */
+  private sessionData = new Map<string, OpenClawSession>()
+
   /** Incrementing counter for assigning numeric IDs to sessions. */
   private nextId = 1
 
@@ -161,6 +164,7 @@ export class OpenClawAdapter {
       this.unsubWebviewReady = null
     }
     this.sessions.clear()
+    this.sessionData.clear()
     this.initialized = false
     this.nextId = 1
     this.consecutiveErrors = 0
@@ -249,6 +253,9 @@ export class OpenClawAdapter {
       const activityMs = this.parseActivityTimestamp(session.lastActivity ?? session.last_activity, now)
       const status = this.deriveStatus(activityMs, now)
 
+      // Store raw session data for name/model/kind lookup
+      this.sessionData.set(key, session)
+
       if (!existing) {
         // New session
         const numericId = this.nextId++
@@ -263,7 +270,12 @@ export class OpenClawAdapter {
         // Only emit individual agentCreated if we've already initialized
         // (on first poll, we'll emit existingAgents instead)
         if (this.initialized) {
-          eventBus.emit('agentCreated', { id: numericId })
+          eventBus.emit('agentCreated', {
+            id: numericId,
+            name: session.name || undefined,
+            model: session.model || undefined,
+            kind: session.kind || undefined,
+          })
           eventBus.emit('agentStatus', { id: numericId, status })
           console.log(`[OpenClaw] Agent #${numericId} created (session: ${key})`)
         }
@@ -283,6 +295,7 @@ export class OpenClawAdapter {
         eventBus.emit('agentClosed', { id: tracked.numericId })
         console.log(`[OpenClaw] Agent #${tracked.numericId} closed (session: ${key})`)
         this.sessions.delete(key)
+        this.sessionData.delete(key)
       }
     }
 
@@ -298,15 +311,20 @@ export class OpenClawAdapter {
     this.loadDefaultLayout().then(() => {
       // Emit existingAgents with all currently tracked sessions
       const agents: number[] = []
-      const agentMeta: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {}
+      const agentMeta: Record<number, { palette: number; hueShift: number; seatId: string | null; name?: string; model?: string; kind?: string }> = {}
 
       for (const tracked of this.sessions.values()) {
         agents.push(tracked.numericId)
         // No persisted palette/seat info from the API, so leave defaults
+        // Include name/model/kind from the session data
+        const sessionData = this.getSessionData(tracked.sessionKey)
         agentMeta[tracked.numericId] = {
           palette: 0,
           hueShift: 0,
           seatId: null,
+          name: sessionData?.name || undefined,
+          model: sessionData?.model || undefined,
+          kind: sessionData?.kind || undefined,
         }
       }
 
@@ -344,6 +362,11 @@ export class OpenClawAdapter {
   }
 
   // ── Helpers ───────────────────────────────────────────────────
+
+  /** Look up raw session data by session key. */
+  private getSessionData(sessionKey: string): OpenClawSession | undefined {
+    return this.sessionData.get(sessionKey)
+  }
 
   /**
    * Extract a stable unique key for a session.

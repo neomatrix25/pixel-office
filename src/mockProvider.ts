@@ -77,10 +77,14 @@ export function startMockProvider(): () => void {
   }
 
   function createMockAgents(): void {
-    const agentIds = [1, 2, 3]
-    for (const id of agentIds) {
-      eventBus.emit('agentCreated', { id })
-      console.log(`[MockProvider] Agent #${id} created`)
+    const mockAgents = [
+      { id: 1, name: 'Coder', model: 'claude-opus-4', kind: 'coder' },
+      { id: 2, name: 'Researcher', model: 'gpt-4o', kind: 'researcher' },
+      { id: 3, name: 'Planner', model: 'claude-sonnet', kind: 'agent' },
+    ]
+    for (const agent of mockAgents) {
+      eventBus.emit('agentCreated', { id: agent.id, name: agent.name, model: agent.model, kind: agent.kind })
+      console.log(`[MockProvider] Agent #${agent.id} (${agent.name}) created`)
     }
 
     // Set initial statuses — agent 1 active, agent 2 active, agent 3 waiting

@@ -36,11 +36,18 @@ export interface FurnitureAsset {
   backgroundTiles?: number
 }
 
+export interface AgentMeta {
+  name?: string
+  model?: string
+  kind?: string
+}
+
 export interface ExtensionMessageState {
   agents: number[]
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
   agentStatuses: Record<number, string>
+  agentMeta: Record<number, AgentMeta>
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
@@ -65,6 +72,7 @@ export function useExtensionMessages(
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({})
+  const [agentMetaState, setAgentMeta] = useState<Record<number, AgentMeta>>({})
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
   const [layoutReady, setLayoutReady] = useState(false)
@@ -75,7 +83,7 @@ export function useExtensionMessages(
 
   useEffect(() => {
     // Buffer agents from existingAgents until layout is loaded
-    let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string }> = []
+    let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string; kind?: string }> = []
 
     // Generic handler that processes event bus messages (same shape as the old MessageEvent.data)
     const handler = (msg: Record<string, unknown>) => {
@@ -98,7 +106,7 @@ export function useExtensionMessages(
         }
         // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {
-          os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true)
+          os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.kind)
         }
         pendingAgents = []
         layoutReadyRef.current = true
@@ -108,9 +116,15 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number
+        const name = msg.name as string | undefined
+        const model = msg.model as string | undefined
+        const kind = msg.kind as string | undefined
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
         setSelectedAgent(id)
-        os.addAgent(id)
+        if (name || model || kind) {
+          setAgentMeta((prev) => ({ ...prev, [id]: { name, model, kind } }))
+        }
+        os.addAgent(id, undefined, undefined, undefined, undefined, kind)
         saveAgentSeats(os)
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number
@@ -128,6 +142,12 @@ export function useExtensionMessages(
           delete next[id]
           return next
         })
+        setAgentMeta((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
         setSubagentTools((prev) => {
           if (!(id in prev)) return prev
           const next = { ...prev }
@@ -140,11 +160,22 @@ export function useExtensionMessages(
         os.removeAgent(id)
       } else if (msg.type === 'existingAgents') {
         const incoming = msg.agents as number[]
-        const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
+        const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string; name?: string; model?: string; kind?: string }>
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id]
-          pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId })
+          pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, kind: m?.kind })
+        }
+        // Store metadata for all existing agents
+        const metaUpdate: Record<number, AgentMeta> = {}
+        for (const id of incoming) {
+          const m = meta[id]
+          if (m?.name || m?.model || m?.kind) {
+            metaUpdate[id] = { name: m?.name, model: m?.model, kind: m?.kind }
+          }
+        }
+        if (Object.keys(metaUpdate).length > 0) {
+          setAgentMeta((prev) => ({ ...prev, ...metaUpdate }))
         }
         setAgents((prev) => {
           const ids = new Set(prev)
@@ -365,5 +396,5 @@ export function useExtensionMessages(
     }
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentMeta: agentMetaState, subagentTools, subagentCharacters, layoutReady, loadedAssets }
 }
