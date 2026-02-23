@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
 import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
-import { EditTool } from './office/types.js'
+import type { EditTool } from './office/types.js'
 import { isRotatable } from './office/layout/furnitureCatalog.js'
 import { useExtensionMessages } from './hooks/useExtensionMessages.js'
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
@@ -13,6 +13,14 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
+import { ConnectionScreen } from './ConnectionScreen.js'
+import type { ConnectionStatus } from './ConnectionScreen.js'
+import { OpenClawAdapter } from './openclawAdapter.js'
+import { saveConnection, clearConnection } from './localStorage.js'
+import { eventBus } from './eventBus.js'
+
+// ── Mock mode detection ─────────────────────────────────────────
+const isMockMode = new URLSearchParams(window.location.search).get('mock') === 'true'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -115,7 +123,58 @@ function EditActionBar({ editor, editorState: es }: { editor: ReturnType<typeof 
   )
 }
 
+// ── Disconnect Button ───────────────────────────────────────────
+
+function DisconnectButton({ onDisconnect }: { onDisconnect: () => void }) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <button
+      onClick={onDisconnect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title="Disconnect from OpenClaw"
+      style={{
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 'var(--pixel-controls-z)' as unknown as number,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '4px 10px',
+        fontSize: '20px',
+        color: hovered ? '#e55' : 'rgba(255, 255, 255, 0.5)',
+        background: hovered ? 'rgba(200, 50, 50, 0.15)' : 'var(--pixel-btn-bg)',
+        border: hovered ? '2px solid rgba(200, 50, 50, 0.4)' : '2px solid transparent',
+        borderRadius: 0,
+        cursor: 'pointer',
+        boxShadow: 'var(--pixel-shadow)',
+        transition: 'none',
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: 'var(--pixel-green)',
+          flexShrink: 0,
+        }}
+      />
+      Disconnect
+    </button>
+  )
+}
+
+// ── Main App ────────────────────────────────────────────────────
+
 function App() {
+  // Connection state (not used in mock mode)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(isMockMode ? 'connected' : 'idle')
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const adapterRef = useRef<OpenClawAdapter | null>(null)
+
   const editor = useEditorActions(getOfficeState, editorState)
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
@@ -153,6 +212,88 @@ function App() {
     // In standalone mode, clicking an agent is a no-op (no terminal to focus)
   }, [])
 
+  // Listen for OpenClaw errors to update connection status
+  useEffect(() => {
+    if (isMockMode) return
+    const unsub = eventBus.on('openclawError', (data) => {
+      setConnectionError(data.message as string)
+      // Don't set status to 'error' for transient polling errors once connected;
+      // only show error if we never successfully connected
+      if (connectionStatus === 'connecting') {
+        setConnectionStatus('error')
+      }
+    })
+    return unsub
+  }, [connectionStatus])
+
+  // ── Connection Handlers ─────────────────────────────────────
+
+  const handleConnect = useCallback((gatewayUrl: string, apiToken: string) => {
+    // Clean up any existing adapter
+    if (adapterRef.current) {
+      adapterRef.current.stop()
+      adapterRef.current = null
+    }
+
+    setConnectionStatus('connecting')
+    setConnectionError(null)
+
+    const adapter = new OpenClawAdapter(gatewayUrl, apiToken)
+    adapterRef.current = adapter
+
+    // Save to localStorage on connect attempt
+    saveConnection(gatewayUrl, apiToken)
+
+    adapter.start()
+
+    // Listen for the first successful layout load as a "connected" signal
+    const unsub = eventBus.on('layoutLoaded', () => {
+      unsub()
+      setConnectionStatus('connected')
+    })
+
+    // Also listen for errors during initial connection
+    const unsubErr = eventBus.on('openclawError', (data) => {
+      unsubErr()
+      setConnectionStatus('error')
+      setConnectionError(data.message as string)
+      // Stop the adapter on initial connection failure
+      adapter.stop()
+      adapterRef.current = null
+    })
+
+    // If layoutLoaded fires, cancel the error listener and vice versa
+    const origUnsub = unsub
+    const origUnsubErr = unsubErr
+    eventBus.on('layoutLoaded', () => { origUnsubErr() })
+    eventBus.on('openclawError', () => { origUnsub() })
+  }, [])
+
+  const handleAutoConnect = useCallback((gatewayUrl: string, apiToken: string) => {
+    handleConnect(gatewayUrl, apiToken)
+  }, [handleConnect])
+
+  const handleDisconnect = useCallback(() => {
+    if (adapterRef.current) {
+      adapterRef.current.stop()
+      adapterRef.current = null
+    }
+    clearConnection()
+    setConnectionStatus('idle')
+    setConnectionError(null)
+    // Reset office state for a clean reconnect
+    officeStateRef.current = null
+  }, [])
+
+  // Cleanup adapter on unmount
+  useEffect(() => {
+    return () => {
+      if (adapterRef.current) {
+        adapterRef.current.stop()
+      }
+    }
+  }, [])
+
   const officeState = getOfficeState()
 
   // Force dependency on editorTickForKeyboard to propagate keyboard-triggered re-renders
@@ -164,11 +305,33 @@ function App() {
       const item = officeState.getLayout().furniture.find((f) => f.uid === editorState.selectedFurnitureUid)
       if (item && isRotatable(item.type)) return true
     }
-    if (editorState.activeTool === EditTool.FURNITURE_PLACE && isRotatable(editorState.selectedFurnitureType)) {
+    if (editorState.activeTool === ('furniture_place' as EditTool) && isRotatable(editorState.selectedFurnitureType)) {
       return true
     }
     return false
   })()
+
+  // ── Show ConnectionScreen when not connected (and not in mock mode) ──
+
+  if (!isMockMode && connectionStatus !== 'connected') {
+    return (
+      <>
+        <style>{`
+          @keyframes pixel-agents-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+          }
+          .pixel-agents-pulse { animation: pixel-agents-pulse ${PULSE_ANIMATION_DURATION_SEC}s ease-in-out infinite; }
+        `}</style>
+        <ConnectionScreen
+          status={connectionStatus}
+          errorMessage={connectionError}
+          onConnect={handleConnect}
+          onAutoConnect={handleAutoConnect}
+        />
+      </>
+    )
+  }
 
   if (!layoutReady) {
     return (
@@ -217,6 +380,9 @@ function App() {
           zIndex: 40,
         }}
       />
+
+      {/* Disconnect button (only when connected to OpenClaw, not in mock mode) */}
+      {!isMockMode && <DisconnectButton onDisconnect={handleDisconnect} />}
 
       <BottomToolbar
         isEditMode={editor.isEditMode}
