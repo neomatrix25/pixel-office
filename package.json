@@ -21,7 +21,7 @@
     "serve": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "VITE_GATEWAY_URL=/ VITE_GATEWAY_TOKEN=bridge npm run build"
   },
   "keywords": [
     "openclaw",

@@ -1,0 +1,10 @@
+src/
+*.ts
+*.tsx
+tsconfig*.json
+vite.config.ts
+eslint.config.js
+.vscode/
+.idea/
+.git/
+node_modules/
