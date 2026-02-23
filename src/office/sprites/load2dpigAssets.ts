@@ -30,6 +30,33 @@ function toTiles(px: number): number {
   return Math.max(1, Math.ceil(px / TILE_PX))
 }
 
+// ── Sprite scaling ─────────────────────────────────────────────────
+// 2dPig sprites are drawn at a finer pixel scale than the hand-drawn
+// characters (11px vs 16px body width). Scale them down so furniture
+// looks proportional to the characters.
+const SPRITE_SCALE = 0.75
+
+/** Nearest-neighbor downscale a SpriteData (string[][]) by a factor. */
+function scaleSprite(sprite: string[][], scale: number): string[][] {
+  if (scale === 1) return sprite
+  const srcH = sprite.length
+  const srcW = srcH > 0 ? sprite[0].length : 0
+  if (srcW === 0 || srcH === 0) return sprite
+  const dstH = Math.max(1, Math.round(srcH * scale))
+  const dstW = Math.max(1, Math.round(srcW * scale))
+  const result: string[][] = []
+  for (let y = 0; y < dstH; y++) {
+    const row: string[] = []
+    const srcY = Math.min(Math.floor(y / scale), srcH - 1)
+    for (let x = 0; x < dstW; x++) {
+      const srcX = Math.min(Math.floor(x / scale), srcW - 1)
+      row.push(sprite[srcY][srcX])
+    }
+    result.push(row)
+  }
+  return result
+}
+
 // ── Sprite → Catalog Entry Mapping ──────────────────────────────
 // Each entry maps a sprite name from the JSON to a FurnitureAsset catalog entry
 // with category, footprint, and placement metadata.
@@ -149,12 +176,13 @@ export function load2dpigAssets(): void {
     })
   }
 
-  // Build sprite map with 2dpig- prefixed keys to match catalog IDs
+  // Build sprite map with 2dpig- prefixed keys to match catalog IDs.
+  // Scale sprites down so they look proportional to the hand-drawn characters.
   const spriteMap: Record<string, string[][]> = {}
   for (const [name, sprite] of Object.entries(sprites)) {
     if (SKIP_SPRITES.has(name)) continue
     if (!SPRITE_META[name]) continue
-    spriteMap[`2dpig-${name}`] = sprite
+    spriteMap[`2dpig-${name}`] = scaleSprite(sprite, SPRITE_SCALE)
   }
 
   console.log(`[2dPig] Loaded ${catalog.length} furniture assets from 2dPig sprite pack`)
