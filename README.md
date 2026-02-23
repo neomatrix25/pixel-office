@@ -45,7 +45,7 @@ npx pixel-office-openclaw
 ### From source
 
 ```bash
-git clone https://github.com/neomatrix25/pixel-office.git
+git clone https://github.com/neomatrix25/pixel-office-openclaw.git
 cd pixel-office
 npm install
 npm run build
