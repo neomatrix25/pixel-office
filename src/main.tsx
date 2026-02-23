@@ -3,6 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// ?reset=true clears all localStorage and reloads with a clean slate
+if (new URLSearchParams(window.location.search).get('reset') === 'true') {
+  localStorage.clear()
+  window.location.href = window.location.pathname
+}
+
 // Only start the mock data provider when ?mock=true is in the URL.
 // In normal mode, the OpenClawAdapter (started from App.tsx) handles events.
 const isMockMode = new URLSearchParams(window.location.search).get('mock') === 'true'
