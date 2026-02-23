@@ -15,8 +15,8 @@ export const WANDER_PAUSE_MIN_SEC = 2.0
 export const WANDER_PAUSE_MAX_SEC = 20.0
 export const WANDER_MOVES_BEFORE_REST_MIN = 3
 export const WANDER_MOVES_BEFORE_REST_MAX = 6
-export const SEAT_REST_MIN_SEC = 120.0
-export const SEAT_REST_MAX_SEC = 240.0
+export const SEAT_REST_MIN_SEC = 15.0
+export const SEAT_REST_MAX_SEC = 40.0
 
 // ── Matrix Effect ────────────────────────────────────────────
 export const MATRIX_EFFECT_DURATION_SEC = 0.3

@@ -85,6 +85,7 @@ export function updateCharacter(
   ch: Character,
   dt: number,
   walkableTiles: Array<{ col: number; row: number }>,
+  poiTiles: Array<{ col: number; row: number }>,
   seats: Map<string, Seat>,
   tileMap: TileTypeVal[][],
   blockedTiles: Set<string>,
@@ -165,7 +166,10 @@ export function updateCharacter(
           }
         }
         if (walkableTiles.length > 0) {
-          const target = walkableTiles[Math.floor(Math.random() * walkableTiles.length)]
+          // Prefer POI tiles (near cooler, whiteboard, etc.) 40% of the time
+          const usePoi = poiTiles.length > 0 && Math.random() < 0.4
+          const candidates = usePoi ? poiTiles : walkableTiles
+          const target = candidates[Math.floor(Math.random() * candidates.length)]
           const path = findPath(ch.tileCol, ch.tileRow, target.col, target.row, tileMap, blockedTiles)
           if (path.length > 0) {
             ch.path = path

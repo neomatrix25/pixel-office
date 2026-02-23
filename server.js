@@ -1,92 +1,137 @@
 #!/usr/bin/env node
 /**
  * Pixel Office production server.
- * Serves the built static files and bridges session data from the
- * OpenClaw CLI to the browser via GET /sessions_list.
+ * Serves the built static files and bridges session data from
+ * OpenClaw agent session stores to the browser via GET /sessions_list.
  *
  * Environment variables:
  *   PORT                 — HTTP port (default: 3002)
- *   OPENCLAW_CLI         — Path to openclaw CLI binary (default: "openclaw")
- *   OPENCLAW_ACTIVE_MIN  — Active window in minutes for session query (default: 60)
+ *   OPENCLAW_HOME        — OpenClaw home directory (default: ~/.openclaw)
+ *   OPENCLAW_ACTIVE_MIN  — Active window in minutes for session filtering (default: 60)
+ *   OPENCLAW_AGENTS      — Comma-separated agent IDs to scan (default: auto-detect)
  *
  * Usage:
  *   npm run build && node server.js
- *   # or with custom CLI path:
- *   OPENCLAW_CLI=/usr/local/bin/openclaw node server.js
  */
 
 import express from 'express'
-import { execSync } from 'child_process'
+import { readFileSync, readdirSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { homedir } from 'os'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const PORT = parseInt(process.env.PORT || '3002', 10)
-const OPENCLAW_CLI = process.env.OPENCLAW_CLI || 'openclaw'
-const ACTIVE_MINUTES = process.env.OPENCLAW_ACTIVE_MIN || '60'
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || join(homedir(), '.openclaw')
+const ACTIVE_MINUTES = parseInt(process.env.OPENCLAW_ACTIVE_MIN || '60', 10)
+const AGENT_IDS = process.env.OPENCLAW_AGENTS
+  ? process.env.OPENCLAW_AGENTS.split(',').map((s) => s.trim())
+  : null // null = auto-detect from directory listing
 
 const app = express()
 
-// ── Sessions Bridge (CLI → HTTP) ────────────────────────────────
+// ── Sessions Bridge (File Store → HTTP) ──────────────────────────
 
 /**
- * Transform OpenClaw CLI session data to the format expected by
- * the Pixel Office adapter (openclawAdapter.ts).
+ * Discover agent IDs by scanning the agents directory.
+ * Returns array of directory names under OPENCLAW_HOME/agents/.
  */
-function transformSessions(cliOutput) {
-  const data = JSON.parse(cliOutput)
-  const sessions = data.sessions || []
-
-  return {
-    sessions: sessions.map((s) => {
-      // Extract agent name from key: "agent:main:slack:channel:xxx" → "main"
-      const keyParts = (s.key || '').split(':')
-      const agentName = keyParts.length >= 2 ? keyParts[1] : 'unknown'
-
-      // Determine status from last message
-      let status = 'idle'
-      const lastMsg = Array.isArray(s.messages) ? s.messages[0] : null
-      if (lastMsg) {
-        if (lastMsg.role === 'assistant') {
-          // Check if the assistant is actively using tools
-          const content = Array.isArray(lastMsg.content) ? lastMsg.content : []
-          const hasToolCall = content.some((c) => c.type === 'toolCall' || c.type === 'tool_use')
-          status = hasToolCall ? 'active' : 'waiting'
-        } else {
-          status = 'waiting' // User message = agent is waiting for processing
-        }
-      }
-
-      return {
-        sessionKey: s.key || s.sessionId,
-        kind: s.kind || 'agent',
-        name: s.displayName || agentName,
-        model: s.model || 'unknown',
-        lastActivity: s.updatedAt, // Already Unix ms
-        status,
-        agentId: agentName,
-      }
-    }),
+function discoverAgents() {
+  const agentsDir = join(OPENCLAW_HOME, 'agents')
+  if (!existsSync(agentsDir)) return []
+  try {
+    return readdirSync(agentsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+  } catch {
+    return []
   }
+}
+
+/**
+ * Read all sessions from an agent's session store file.
+ * Returns array of session objects with agentId injected.
+ */
+function readAgentSessions(agentId) {
+  const sessionsFile = join(OPENCLAW_HOME, 'agents', agentId, 'sessions', 'sessions.json')
+  if (!existsSync(sessionsFile)) return []
+
+  try {
+    const raw = readFileSync(sessionsFile, 'utf-8')
+    const data = JSON.parse(raw)
+
+    // The file is a flat dict keyed by session key
+    const sessions = []
+    const now = Date.now()
+    const cutoff = now - ACTIVE_MINUTES * 60 * 1000
+
+    for (const [key, session] of Object.entries(data)) {
+      const s = session
+      const updatedAt = s.updatedAt || 0
+
+      // Filter by activity window
+      if (updatedAt < cutoff) continue
+
+      sessions.push({
+        sessionKey: key,
+        kind: s.kind || 'agent',
+        name: s.displayName || agentId,
+        model: s.model || 'unknown',
+        lastActivity: updatedAt,
+        status: deriveStatus(s, now),
+        agentId,
+      })
+    }
+
+    return sessions
+  } catch (err) {
+    console.error(`[bridge] Error reading ${agentId} sessions:`, err.message)
+    return []
+  }
+}
+
+/**
+ * Derive agent status from session data.
+ */
+function deriveStatus(session, now) {
+  // If updated within last 10 seconds, consider active
+  if (session.updatedAt && (now - session.updatedAt) < 10000) {
+    return 'active'
+  }
+
+  // Check last message for tool activity
+  const messages = session.messages || session.last_messages
+  const lastMsg = Array.isArray(messages) ? messages[0] : null
+  if (lastMsg) {
+    if (lastMsg.role === 'assistant') {
+      const content = Array.isArray(lastMsg.content) ? lastMsg.content : []
+      const hasToolCall = content.some((c) => c.type === 'toolCall' || c.type === 'tool_use')
+      return hasToolCall ? 'active' : 'waiting'
+    }
+    return 'waiting'
+  }
+
+  return 'idle'
 }
 
 app.get('/sessions_list', (_req, res) => {
   try {
-    const cmd = `${OPENCLAW_CLI} sessions --json --active ${ACTIVE_MINUTES}`
-    const output = execSync(cmd, {
-      timeout: 10000,
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
-    const transformed = transformSessions(output)
-    res.json(transformed)
+    const agents = AGENT_IDS || discoverAgents()
+    const allSessions = []
+
+    for (const agentId of agents) {
+      const sessions = readAgentSessions(agentId)
+      allSessions.push(...sessions)
+    }
+
+    res.json({ sessions: allSessions })
   } catch (err) {
-    const message = err.stderr || err.message || 'CLI execution failed'
-    console.error('[bridge] CLI error:', message)
+    const message = err.message || 'Session store read failed'
+    console.error('[bridge] Error:', message)
     res.status(500).json({
-      error: 'CLI execution failed',
+      error: 'Session store read failed',
       detail: String(message).slice(0, 200),
     })
   }
@@ -111,6 +156,9 @@ app.get('/{*path}', (_req, res) => {
 // ── Start ───────────────────────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {
+  const agents = AGENT_IDS || discoverAgents()
   console.log(`[server] Pixel Office running at http://0.0.0.0:${PORT}`)
-  console.log(`[server] CLI bridge: ${OPENCLAW_CLI} sessions --json --active ${ACTIVE_MINUTES}`)
+  console.log(`[server] Session store: ${OPENCLAW_HOME}/agents/`)
+  console.log(`[server] Scanning ${agents.length} agents: ${agents.join(', ')}`)
+  console.log(`[server] Activity window: ${ACTIVE_MINUTES} minutes`)
 })

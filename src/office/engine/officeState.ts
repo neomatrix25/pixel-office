@@ -33,6 +33,8 @@ export class OfficeState {
   blockedTiles: Set<string>
   furniture: FurnitureInstance[]
   walkableTiles: Array<{ col: number; row: number }>
+  /** Walkable tiles adjacent to non-desk furniture (cooler, whiteboard, plant, etc.) */
+  poiTiles: Array<{ col: number; row: number }>
   characters: Map<number, Character> = new Map()
   selectedAgentId: number | null = null
   cameraFollowId: number | null = null
@@ -51,6 +53,7 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(this.layout.furniture)
     this.furniture = layoutToFurnitureInstances(this.layout.furniture)
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
+    this.poiTiles = this.computePoiTiles()
   }
 
   /** Rebuild all derived state from a new layout. Reassigns existing characters.
@@ -62,6 +65,7 @@ export class OfficeState {
     this.blockedTiles = getBlockedTiles(layout.furniture)
     this.rebuildFurnitureInstances()
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
+    this.poiTiles = this.computePoiTiles()
 
     // Shift character positions when grid expands left/up
     if (shift && (shift.col !== 0 || shift.row !== 0)) {
@@ -148,6 +152,44 @@ export class OfficeState {
     const seat = this.seats.get(ch.seatId)
     if (!seat) return null
     return `${seat.seatCol},${seat.seatRow}`
+  }
+
+  /**
+   * Compute "points of interest" — walkable tiles adjacent to non-desk
+   * furniture (cooler, whiteboard, plant, bookshelf, lamp). Idle agents
+   * prefer wandering to these tiles for more natural behavior.
+   */
+  private computePoiTiles(): Array<{ col: number; row: number }> {
+    const walkableSet = new Set(this.walkableTiles.map((t) => `${t.col},${t.row}`))
+    const poiSet = new Set<string>()
+    const cols = this.layout.cols
+    const rows = this.layout.rows
+
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type)
+      if (!entry || entry.isDesk) continue // skip desks — agents sit there when working
+
+      const fw = entry.footprintW
+      const fh = entry.footprintH
+
+      // Check all tiles adjacent to this furniture piece
+      for (let dc = -1; dc <= fw; dc++) {
+        for (let dr = -1; dr <= fh; dr++) {
+          // Skip interior tiles (only want adjacent)
+          if (dc >= 0 && dc < fw && dr >= 0 && dr < fh) continue
+          const tc = item.col + dc
+          const tr = item.row + dr
+          if (tc < 0 || tc >= cols || tr < 0 || tr >= rows) continue
+          const key = `${tc},${tr}`
+          if (walkableSet.has(key)) poiSet.add(key)
+        }
+      }
+    }
+
+    return Array.from(poiSet).map((k) => {
+      const [c, r] = k.split(',').map(Number)
+      return { col: c, row: r }
+    })
   }
 
   /** Temporarily unblock a character's own seat, run fn, then re-block */
@@ -673,7 +715,7 @@ export class OfficeState {
 
       // Temporarily unblock own seat so character can pathfind to it
       this.withOwnSeatUnblocked(ch, () =>
-        updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles)
+        updateCharacter(ch, dt, this.walkableTiles, this.poiTiles, this.seats, this.tileMap, this.blockedTiles)
       )
 
       // Tick bubble timer for waiting bubbles
