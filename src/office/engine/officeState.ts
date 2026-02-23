@@ -193,14 +193,55 @@ export class OfficeState {
     return { palette, hueShift }
   }
 
-  addAgent(id: number, preferredPalette?: number, preferredHueShift?: number, preferredSeatId?: string, skipSpawnEffect?: boolean, _kind?: string): void {
+  /**
+   * Map agent kind/role to a specific palette + hue shift.
+   * This makes agents visually distinguishable by role.
+   */
+  private pickPaletteForKind(kind: string): { palette: number; hueShift: number } {
+    const kindLower = kind.toLowerCase()
+    // Deterministic mapping: each role gets a preferred palette
+    const kindPaletteMap: Record<string, number> = {
+      coder: 0,
+      developer: 0,
+      engineer: 0,
+      researcher: 1,
+      analyst: 1,
+      agent: 2,
+      planner: 3,
+      coordinator: 3,
+      manager: 3,
+      reviewer: 4,
+      tester: 4,
+      writer: 5,
+      designer: 5,
+    }
+    const basePalette = kindPaletteMap[kindLower]
+    if (basePalette !== undefined) {
+      // Check if this palette is already heavily used; if so, add hue shift
+      let count = 0
+      for (const ch of this.characters.values()) {
+        if (!ch.isSubagent && ch.palette === basePalette) count++
+      }
+      const hueShift = count > 0 ? HUE_SHIFT_MIN_DEG + Math.floor(Math.random() * HUE_SHIFT_RANGE_DEG) : 0
+      return { palette: basePalette, hueShift }
+    }
+    // Unknown kind: fall back to diverse palette picking
+    return this.pickDiversePalette()
+  }
+
+  addAgent(id: number, preferredPalette?: number, preferredHueShift?: number, preferredSeatId?: string, skipSpawnEffect?: boolean, kind?: string): void {
     if (this.characters.has(id)) return
 
     let palette: number
     let hueShift: number
-    if (preferredPalette !== undefined) {
+    if (preferredPalette !== undefined && preferredPalette !== 0) {
       palette = preferredPalette
       hueShift = preferredHueShift ?? 0
+    } else if (kind) {
+      // Role-based palette: deterministic mapping from kind to palette
+      const pick = this.pickPaletteForKind(kind)
+      palette = pick.palette
+      hueShift = pick.hueShift
     } else {
       const pick = this.pickDiversePalette()
       palette = pick.palette
