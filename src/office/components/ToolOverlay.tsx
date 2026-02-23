@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter, AgentMeta } from '../../hooks/useExtensionMessages.js'
@@ -116,6 +116,48 @@ function getActivityText(
   return isActive ? 'Working...' : ''
 }
 
+// ── Chat History (localStorage) ──────────────────────────────────
+
+interface ChatMessage {
+  role: 'user' | 'agent'
+  text: string
+  ts: number
+}
+
+function getChatKey(agentId: string | undefined): string {
+  return `pixel-office-chat:${agentId || 'unknown'}`
+}
+
+function loadChatHistory(agentId: string | undefined): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(getChatKey(agentId))
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveChatHistory(agentId: string | undefined, messages: ChatMessage[]): void {
+  try {
+    // Keep last 50 messages
+    const trimmed = messages.slice(-50)
+    localStorage.setItem(getChatKey(agentId), JSON.stringify(trimmed))
+  } catch { /* ignore */ }
+}
+
+async function sendChatMessage(agentId: string, message: string): Promise<boolean> {
+  try {
+    const resp = await fetch('/api/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId, message }),
+    })
+    return resp.ok
+  } catch {
+    return false
+  }
+}
+
 // ── Detail Card (click popup) ────────────────────────────────────
 
 function AgentDetailCard({
@@ -136,6 +178,40 @@ function AgentDetailCard({
   const model = meta?.model || 'unknown'
   const idleLabel = getIdleLabel(lastActivityMs)
   const timeAgo = relativeTime(lastActivityMs)
+  const agentId = meta?.agentId
+
+  // Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => loadChatHistory(agentId))
+  const [chatInput, setChatInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const chatEndRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages.length])
+
+  const handleSend = useCallback(async () => {
+    const text = chatInput.trim()
+    if (!text || !agentId || sending) return
+
+    const msg: ChatMessage = { role: 'user', text, ts: Date.now() }
+    const updated = [...chatMessages, msg]
+    setChatMessages(updated)
+    saveChatHistory(agentId, updated)
+    setChatInput('')
+    setSending(true)
+
+    const ok = await sendChatMessage(agentId, text)
+    if (!ok) {
+      // Add error feedback
+      const errMsg: ChatMessage = { role: 'agent', text: '(failed to deliver)', ts: Date.now() }
+      const withErr = [...updated, errMsg]
+      setChatMessages(withErr)
+      saveChatHistory(agentId, withErr)
+    }
+    setSending(false)
+  }, [chatInput, agentId, sending, chatMessages])
 
   return (
     <div
@@ -145,8 +221,8 @@ function AgentDetailCard({
         borderRadius: 0,
         padding: '6px 10px',
         boxShadow: 'var(--pixel-shadow)',
-        minWidth: 180,
-        maxWidth: 260,
+        minWidth: 200,
+        maxWidth: 280,
         marginTop: 4,
       }}
     >
@@ -172,7 +248,7 @@ function AgentDetailCard({
         </div>
       )}
 
-      {/* Last message */}
+      {/* Last message from session */}
       {lastMessage && (
         <div style={{
           fontSize: '18px',
@@ -188,6 +264,91 @@ function AgentDetailCard({
           lineHeight: 1.3,
         }}>
           {lastMessage}
+        </div>
+      )}
+
+      {/* Chat section */}
+      {agentId && (
+        <div style={{
+          marginTop: 6,
+          paddingTop: 6,
+          borderTop: '1px solid var(--pixel-border)',
+        }}>
+          {/* Chat history */}
+          {chatMessages.length > 0 && (
+            <div style={{
+              maxHeight: 120,
+              overflowY: 'auto',
+              marginBottom: 4,
+              fontSize: '18px',
+              lineHeight: 1.4,
+            }}>
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  style={{
+                    marginBottom: 3,
+                    color: msg.role === 'user' ? 'var(--vscode-foreground)' : 'var(--pixel-text-dim)',
+                    fontStyle: msg.role === 'agent' ? 'italic' : undefined,
+                  }}
+                >
+                  <span style={{ fontWeight: 'bold' }}>
+                    {msg.role === 'user' ? 'You' : displayName}:
+                  </span>{' '}
+                  {msg.text}
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {/* Chat input */}
+          <div style={{ display: 'flex', gap: 3 }}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  void handleSend()
+                }
+                e.stopPropagation()
+              }}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={`Message ${displayName}...`}
+              style={{
+                flex: 1,
+                background: 'var(--pixel-input-bg, rgba(255,255,255,0.08))',
+                border: '1px solid var(--pixel-border)',
+                borderRadius: 0,
+                color: 'var(--vscode-foreground)',
+                fontSize: '18px',
+                padding: '3px 6px',
+                outline: 'none',
+                minWidth: 0,
+              }}
+            />
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                void handleSend()
+              }}
+              disabled={sending || !chatInput.trim()}
+              style={{
+                background: sending ? 'var(--pixel-border)' : 'var(--pixel-btn-bg, rgba(255,255,255,0.12))',
+                border: '1px solid var(--pixel-border)',
+                borderRadius: 0,
+                color: 'var(--vscode-foreground)',
+                fontSize: '18px',
+                padding: '3px 8px',
+                cursor: sending ? 'wait' : 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              {sending ? '...' : '\u{27A4}'}
+            </button>
+          </div>
         </div>
       )}
     </div>

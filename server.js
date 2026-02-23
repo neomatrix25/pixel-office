@@ -16,6 +16,7 @@
 
 import express from 'express'
 import { readFileSync, readdirSync, existsSync } from 'fs'
+import { execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { homedir } from 'os'
@@ -31,6 +32,7 @@ const AGENT_IDS = process.env.OPENCLAW_AGENTS
   : null // null = auto-detect from directory listing
 
 const app = express()
+app.use(express.json())
 
 // ── Sessions Bridge (File Store → HTTP) ──────────────────────────
 
@@ -164,6 +166,44 @@ app.get('/sessions_list', (_req, res) => {
 app.get('/api/sessions', (req, res) => {
   req.url = '/sessions_list'
   app.handle(req, res)
+})
+
+// ── Chat Bridge (Send Message → Agent) ───────────────────────────
+
+app.post('/api/send', (req, res) => {
+  const { agentId, message } = req.body || {}
+  if (!agentId || !message) {
+    return res.status(400).json({ error: 'Missing agentId or message' })
+  }
+
+  // Sanitize inputs to prevent command injection
+  const safeAgentId = String(agentId).replace(/[^a-zA-Z0-9_-]/g, '')
+  const safeMessage = String(message).slice(0, 2000)
+
+  try {
+    // Fire-and-forget: send message to agent via CLI
+    // Use stdin to avoid shell injection via message content
+    execSync(
+      `echo ${JSON.stringify(safeMessage)} | openclaw agent --agent ${safeAgentId} --stdin`,
+      { timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+    )
+    console.log(`[bridge] Sent message to agent ${safeAgentId}: ${safeMessage.slice(0, 50)}...`)
+    res.json({ ok: true, agentId: safeAgentId })
+  } catch (err) {
+    // If the CLI doesn't support --stdin, try --message flag
+    try {
+      execSync(
+        `openclaw agent --agent ${safeAgentId} --message ${JSON.stringify(safeMessage)}`,
+        { timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+      )
+      console.log(`[bridge] Sent message to agent ${safeAgentId}: ${safeMessage.slice(0, 50)}...`)
+      res.json({ ok: true, agentId: safeAgentId })
+    } catch (err2) {
+      const detail = err2.message || 'CLI command failed'
+      console.error(`[bridge] Send failed for ${safeAgentId}:`, detail)
+      res.status(500).json({ error: 'Failed to send message', detail: detail.slice(0, 200) })
+    }
+  }
 })
 
 // ── Static Files ────────────────────────────────────────────────
