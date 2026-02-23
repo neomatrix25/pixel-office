@@ -272,7 +272,10 @@ app.post('/api/send', async (req, res) => {
         console.log(`[bridge] Sent to ${safeAgentId} (CLI): ${safeMessage.slice(0, 50)}...`)
         try {
           const parsed = JSON.parse(cliResult)
-          return res.json({ ok: true, agentId: safeAgentId, reply: parsed.reply || parsed.text || parsed.result || cliResult.trim() })
+          // OpenClaw CLI returns { result: { payloads: [{ text: "..." }] } }
+          const reply = parsed.result?.payloads?.[0]?.text
+            || parsed.reply || parsed.text || parsed.result || cliResult.trim()
+          return res.json({ ok: true, agentId: safeAgentId, reply })
         } catch {
           return res.json({ ok: true, agentId: safeAgentId, reply: cliResult.trim() })
         }
