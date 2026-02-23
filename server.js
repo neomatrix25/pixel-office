@@ -151,7 +151,18 @@ app.get('/sessions_list', (_req, res) => {
       allSessions.push(...sessions)
     }
 
-    res.json({ sessions: allSessions })
+    // Dedup: one entry per agentId, keep the most recent session
+    const byAgent = new Map()
+    for (const s of allSessions) {
+      const key = s.agentId
+      const existing = byAgent.get(key)
+      if (!existing || (s.lastActivity || 0) > (existing.lastActivity || 0)) {
+        byAgent.set(key, s)
+      }
+    }
+    const dedupedSessions = [...byAgent.values()]
+
+    res.json({ sessions: dedupedSessions })
   } catch (err) {
     const message = err.message || 'Session store read failed'
     console.error('[bridge] Error:', message)
