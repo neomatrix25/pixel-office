@@ -22,6 +22,11 @@ import { eventBus } from './eventBus.js'
 // ── Mock mode detection ─────────────────────────────────────────
 const isMockMode = new URLSearchParams(window.location.search).get('mock') === 'true'
 
+// ── Env-based auto-connect (skip connection screen) ─────────────
+const envGatewayUrl = import.meta.env.VITE_GATEWAY_URL as string | undefined
+const envGatewayToken = import.meta.env.VITE_GATEWAY_TOKEN as string | undefined
+const isEnvConnect = !!(envGatewayUrl && envGatewayToken)
+
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
 const editorState = new EditorState()
@@ -198,7 +203,7 @@ function ErrorToasts({
 // ── Main App ────────────────────────────────────────────────────
 
 function App() {
-  // Connection state (not used in mock mode)
+  // Connection state (not used in mock mode or env-connect mode)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(isMockMode ? 'connected' : 'idle')
   const [connectionError, setConnectionError] = useState<string | null>(null)
   const [gatewayHost, setGatewayHost] = useState<string>(isMockMode ? 'mock' : '')
@@ -332,6 +337,13 @@ function App() {
     officeStateRef.current = null
   }, [])
 
+  // Auto-connect from env vars on mount (skip connection screen entirely)
+  useEffect(() => {
+    if (isEnvConnect && !isMockMode && connectionStatus === 'idle') {
+      handleConnect(envGatewayUrl!, envGatewayToken!)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Cleanup adapter on unmount
   useEffect(() => {
     return () => {
@@ -360,7 +372,7 @@ function App() {
 
   // ── Show ConnectionScreen when not connected (and not in mock mode) ──
 
-  if (!isMockMode && connectionStatus !== 'connected') {
+  if (!isMockMode && !isEnvConnect && connectionStatus !== 'connected') {
     return (
       <>
         <style>{`
@@ -382,8 +394,15 @@ function App() {
 
   if (!layoutReady) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc' }}>
-        Loading...
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ccc', flexDirection: 'column', gap: 8 }}>
+        {isEnvConnect && connectionStatus === 'error' ? (
+          <>
+            <div style={{ color: '#e55' }}>Connection failed</div>
+            <div style={{ fontSize: '12px', color: '#888' }}>{connectionError}</div>
+          </>
+        ) : (
+          'Loading...'
+        )}
       </div>
     )
   }
