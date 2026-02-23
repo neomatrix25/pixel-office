@@ -1,20 +1,22 @@
 #!/usr/bin/env node
 /**
  * Pixel Office production server.
- * Serves the built static files and proxies /sessions_list to the
- * OpenClaw internal gateway.
+ * Serves the built static files and bridges session data from the
+ * OpenClaw CLI to the browser via GET /sessions_list.
  *
  * Environment variables:
- *   PORT               — HTTP port (default: 3002)
- *   OPENCLAW_GATEWAY_URL — Internal gateway URL (e.g. http://localhost:18789)
- *   OPENCLAW_GATEWAY_TOKEN — Bearer token for the gateway (optional)
+ *   PORT                 — HTTP port (default: 3002)
+ *   OPENCLAW_CLI         — Path to openclaw CLI binary (default: "openclaw")
+ *   OPENCLAW_ACTIVE_MIN  — Active window in minutes for session query (default: 60)
  *
  * Usage:
- *   OPENCLAW_GATEWAY_URL=http://localhost:18789 node server.js
+ *   npm run build && node server.js
+ *   # or with custom CLI path:
+ *   OPENCLAW_CLI=/usr/local/bin/openclaw node server.js
  */
 
 import express from 'express'
-import { createProxyMiddleware } from 'http-proxy-middleware'
+import { execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -22,69 +24,79 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const PORT = parseInt(process.env.PORT || '3002', 10)
-const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL
-const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
+const OPENCLAW_CLI = process.env.OPENCLAW_CLI || 'openclaw'
+const ACTIVE_MINUTES = process.env.OPENCLAW_ACTIVE_MIN || '60'
 
 const app = express()
 
-// ── API Proxy / Bridge ──────────────────────────────────────────
+// ── Sessions Bridge (CLI → HTTP) ────────────────────────────────
 
-if (GATEWAY_URL) {
-  console.log(`[server] Proxying /sessions_list → ${GATEWAY_URL}`)
+/**
+ * Transform OpenClaw CLI session data to the format expected by
+ * the Pixel Office adapter (openclawAdapter.ts).
+ */
+function transformSessions(cliOutput) {
+  const data = JSON.parse(cliOutput)
+  const sessions = data.sessions || []
 
-  // Proxy sessions_list requests to the internal gateway
-  app.use(
-    '/sessions_list',
-    createProxyMiddleware({
-      target: GATEWAY_URL,
-      changeOrigin: true,
-      headers: GATEWAY_TOKEN
-        ? { Authorization: `Bearer ${GATEWAY_TOKEN}` }
-        : undefined,
-      on: {
-        error: (err, _req, res) => {
-          console.error('[proxy] Error:', err.message)
-          if (res.writeHead) {
-            res.writeHead(502, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ error: 'Gateway unreachable', detail: err.message }))
-          }
-        },
-      },
-    })
-  )
+  return {
+    sessions: sessions.map((s) => {
+      // Extract agent name from key: "agent:main:slack:channel:xxx" → "main"
+      const keyParts = (s.key || '').split(':')
+      const agentName = keyParts.length >= 2 ? keyParts[1] : 'unknown'
 
-  // Also proxy /api/* if the gateway uses that path
-  app.use(
-    '/api',
-    createProxyMiddleware({
-      target: GATEWAY_URL,
-      changeOrigin: true,
-      headers: GATEWAY_TOKEN
-        ? { Authorization: `Bearer ${GATEWAY_TOKEN}` }
-        : undefined,
-      on: {
-        error: (err, _req, res) => {
-          console.error('[proxy] Error:', err.message)
-          if (res.writeHead) {
-            res.writeHead(502, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ error: 'Gateway unreachable', detail: err.message }))
-          }
-        },
-      },
-    })
-  )
-} else {
-  console.log('[server] No OPENCLAW_GATEWAY_URL set — API proxy disabled')
-  console.log('[server] The app will show the connection screen or use mock mode')
+      // Determine status from last message
+      let status = 'idle'
+      const lastMsg = Array.isArray(s.messages) ? s.messages[0] : null
+      if (lastMsg) {
+        if (lastMsg.role === 'assistant') {
+          // Check if the assistant is actively using tools
+          const content = Array.isArray(lastMsg.content) ? lastMsg.content : []
+          const hasToolCall = content.some((c) => c.type === 'toolCall' || c.type === 'tool_use')
+          status = hasToolCall ? 'active' : 'waiting'
+        } else {
+          status = 'waiting' // User message = agent is waiting for processing
+        }
+      }
 
-  // Return a helpful error for API requests when no gateway is configured
-  app.get('/sessions_list', (_req, res) => {
-    res.status(503).json({
-      error: 'No gateway configured',
-      message: 'Set OPENCLAW_GATEWAY_URL environment variable to enable the API bridge',
-    })
-  })
+      return {
+        sessionKey: s.key || s.sessionId,
+        kind: s.kind || 'agent',
+        name: s.displayName || agentName,
+        model: s.model || 'unknown',
+        lastActivity: s.updatedAt, // Already Unix ms
+        status,
+        agentId: agentName,
+      }
+    }),
+  }
 }
+
+app.get('/sessions_list', (_req, res) => {
+  try {
+    const cmd = `${OPENCLAW_CLI} sessions --json --active ${ACTIVE_MINUTES}`
+    const output = execSync(cmd, {
+      timeout: 10000,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    const transformed = transformSessions(output)
+    res.json(transformed)
+  } catch (err) {
+    const message = err.stderr || err.message || 'CLI execution failed'
+    console.error('[bridge] CLI error:', message)
+    res.status(500).json({
+      error: 'CLI execution failed',
+      detail: String(message).slice(0, 200),
+    })
+  }
+})
+
+// Also serve at /api/sessions as an alias
+app.get('/api/sessions', (req, res) => {
+  req.url = '/sessions_list'
+  app.handle(req, res)
+})
 
 // ── Static Files ────────────────────────────────────────────────
 
@@ -100,7 +112,5 @@ app.get('*', (_req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[server] Pixel Office running at http://0.0.0.0:${PORT}`)
-  if (GATEWAY_URL) {
-    console.log(`[server] Gateway proxy: ${GATEWAY_URL}`)
-  }
+  console.log(`[server] CLI bridge: ${OPENCLAW_CLI} sessions --json --active ${ACTIVE_MINUTES}`)
 })
