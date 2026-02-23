@@ -13,6 +13,7 @@
  */
 
 import { eventBus } from '../../eventBus.js'
+import { buildDynamicCatalog } from '../layout/furnitureCatalog.js'
 import spriteJson from './2dpigSprites.json'
 
 // Tile size is 16px — footprint = ceil(pixelDim / 16)
@@ -149,5 +150,10 @@ export function load2dpigAssets(): void {
   }
 
   console.log(`[2dPig] Loaded ${catalog.length} furniture assets from 2dPig sprite pack`)
+
+  // Build the dynamic catalog directly (synchronous, no event timing issues)
+  buildDynamicCatalog({ catalog, sprites: spriteMap })
+
+  // Also emit the event for any listeners that need it (e.g., useExtensionMessages state)
   eventBus.emit('furnitureAssetsLoaded', { catalog, sprites: spriteMap })
 }
