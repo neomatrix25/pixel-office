@@ -21,16 +21,19 @@ import type { OfficeLayout } from './office/types.js'
 
 /** A single session entry returned by the OpenClaw API. */
 export interface OpenClawSession {
-  /** Unique session identifier (string key from the API). */
-  session_key: string
+  /** Unique session identifier — camelCase (OpenClaw native) or snake_case. */
+  sessionKey?: string
+  session_key?: string
 
-  /** Session kind/type — e.g. "agent", "chat", "task". May vary by API version. */
+  /** Session kind/type — e.g. "agent", "chat", "task". */
   kind?: string
 
-  /** Agent identifier from the API. Could be string or number. */
+  /** Agent identifier. Could be string or number. camelCase or snake_case. */
+  agentId?: string | number
   agent_id?: string | number
 
-  /** ISO 8601 timestamp or Unix epoch of last activity in this session. */
+  /** ISO 8601 timestamp or Unix epoch of last activity. camelCase or snake_case. */
+  lastActivity?: string | number
   last_activity?: string | number
 
   /** Display name or label for this session. */
@@ -38,6 +41,15 @@ export interface OpenClawSession {
 
   /** Current status string from the API, if provided. */
   status?: string
+
+  /** Model used in this session. */
+  model?: string
+
+  /** ISO 8601 timestamp of session creation. */
+  createdAt?: string
+
+  /** Last message content from the session. */
+  lastMessage?: unknown
 
   /** Last messages in the session (structure TBD). */
   last_messages?: unknown[]
@@ -234,7 +246,7 @@ export class OpenClawAdapter {
       incomingKeys.add(key)
 
       const existing = this.sessions.get(key)
-      const activityMs = this.parseActivityTimestamp(session.last_activity, now)
+      const activityMs = this.parseActivityTimestamp(session.lastActivity ?? session.last_activity, now)
       const status = this.deriveStatus(activityMs, now)
 
       if (!existing) {
@@ -338,7 +350,10 @@ export class OpenClawAdapter {
    * Prefers session_key, falls back to agent_id, then generates one.
    */
   private getSessionKey(session: OpenClawSession): string {
+    // Prefer camelCase (OpenClaw native), fall back to snake_case
+    if (session.sessionKey) return String(session.sessionKey)
     if (session.session_key) return String(session.session_key)
+    if (session.agentId !== undefined) return `agent-${session.agentId}`
     if (session.agent_id !== undefined) return `agent-${session.agent_id}`
     // Last resort: hash some fields together
     return `unknown-${JSON.stringify(session).slice(0, 64)}`
