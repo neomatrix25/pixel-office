@@ -109,6 +109,14 @@ export function buildDynamicCatalog(assets: LoadedAssetData): boolean {
 
   if (allEntries.length === 0) return false
 
+  // Merge hardcoded furniture entries (so existing layouts referencing old types still work)
+  const newTypeSet = new Set(allEntries.map((e) => e.type))
+  for (const entry of FURNITURE_CATALOG) {
+    if (!newTypeSet.has(entry.type)) {
+      allEntries.push(entry)
+    }
+  }
+
   // Build rotation groups from groupId + orientation metadata
   rotationGroups.clear()
   stateGroups.clear()
