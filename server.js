@@ -15,7 +15,7 @@
  */
 
 import express from 'express'
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSync, unlinkSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -292,12 +292,22 @@ const LAYOUT_DIR = join(OPENCLAW_HOME, 'pixel-office')
 const LAYOUT_FILE = join(LAYOUT_DIR, 'layout.json')
 
 app.get('/api/layout', (_req, res) => {
+  // If ?reset query param, skip saved layout entirely
+  if (_req.query.reset === 'true') {
+    return res.status(404).json({ error: 'Reset requested' })
+  }
   try {
     if (!existsSync(LAYOUT_FILE)) {
       return res.status(404).json({ error: 'No saved layout' })
     }
     const raw = readFileSync(LAYOUT_FILE, 'utf-8')
     const layout = JSON.parse(raw)
+    // Sanity check: reject corrupted layouts (too many rows)
+    if (layout.rows > 30) {
+      console.warn(`[bridge] Rejecting corrupted layout (${layout.rows} rows), falling back to default`)
+      unlinkSync(LAYOUT_FILE)
+      return res.status(404).json({ error: 'Corrupted layout removed' })
+    }
     res.json({ layout })
   } catch (err) {
     console.error('[bridge] Error reading layout:', err.message)
