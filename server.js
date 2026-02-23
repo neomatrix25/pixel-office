@@ -264,15 +264,20 @@ app.post('/api/send', async (req, res) => {
     if (!resp.ok) {
       const body = await resp.text()
       console.error(`[bridge] Gateway send failed for ${safeAgentId}: ${resp.status} ${body.slice(0, 200)}`)
-      // Fallback to CLI (execFileSync to prevent shell injection)
+      // Fallback to CLI — use --json to capture the agent's reply
       try {
-        execFileSync('openclaw', ['agent', '--agent', safeAgentId, '--message', safeMessage, '--deliver'],
-          { timeout: 30000, stdio: ['pipe', 'pipe', 'pipe'] }
+        const cliResult = execFileSync('openclaw', ['agent', '--agent', safeAgentId, '--message', safeMessage, '--json'],
+          { timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' }
         )
-        console.log(`[bridge] Sent to ${safeAgentId} (CLI fallback): ${safeMessage.slice(0, 50)}...`)
-        return res.json({ ok: true, agentId: safeAgentId })
+        console.log(`[bridge] Sent to ${safeAgentId} (CLI): ${safeMessage.slice(0, 50)}...`)
+        try {
+          const parsed = JSON.parse(cliResult)
+          return res.json({ ok: true, agentId: safeAgentId, reply: parsed.reply || parsed.text || parsed.result || cliResult.trim() })
+        } catch {
+          return res.json({ ok: true, agentId: safeAgentId, reply: cliResult.trim() })
+        }
       } catch (cliErr) {
-        return res.status(500).json({ error: 'Failed to send message', detail: body.slice(0, 200) })
+        return res.status(500).json({ error: 'Failed to send message', detail: cliErr.message?.slice(0, 200) || body.slice(0, 200) })
       }
     }
 
